@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug",
+  "command": "/usr/bin/cc -g -std=gnu11 -fdiagnostics-color=always -o CMakeFiles/x86_64_Emulator.dir/main.c.o -c \"/home/jay/CLionProjects/x86-64 Emulator/main.c\"",
+  "file": "/home/jay/CLionProjects/x86-64 Emulator/main.c",
+  "output": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug/CMakeFiles/x86_64_Emulator.dir/main.c.o"
+}
+]
