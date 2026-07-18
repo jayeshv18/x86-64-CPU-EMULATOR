@@ -109,3 +109,65 @@ struct instruction parse_line(char* line) {
     }
     return inst;
 }
+
+
+//struct cpu *c: pass in a pointer to your virtual CPU. The function needs to know which CPU it's looking at.
+//cpu_register reg: this is the enum value the parser spit out (e.g., REG_RAX).
+//uint64_t* (Return Type):it returns a memory address.
+//c->rax refers to the actual value sitting inside the struct (e.g., 0).
+//& symbol means "Get the Address Of."
+
+//writing &(c->rax), we are telling the compiler: "Do not give me the value inside RAX. Give me the memory address 0x1000 where RAX is stored."
+uint64_t* get_reg_ptr(struct cpu *c, cpu_register reg) {
+    switch (reg) {
+            case REG_RAX: return &(c->rax);
+            case REG_RBX: return &(c->rbx);
+            case REG_RCX: return &(c->rcx);
+            case REG_RDX: return &(c->rdx);
+            case REG_RSP: return &(c->rsp);
+            case REG_RBP: return &(c->rbp);
+            case REG_RIP: return &(c->rip);
+            default: return NULL;
+    }
+}
+
+void execute_instruction(struct cpu *c, struct instruction inst) {
+    uint64_t *dest = get_reg_ptr(c, inst.dest_reg); //get_reg_ptr() to get the memory address of the destination register.
+    //if HLT was called or an invalid register was passed,
+    // dest might be NULL. We should handle HLT before trying to use 'dest'.
+    if (inst.op==HLT) {
+        printf("HLT: Halting the CPU\n");
+        exit(0);
+    }
+    if (dest==NULL) {
+        printf("ERROR: Invalid destination register\n");
+        return;
+    }
+
+    //need the actual integer value to add/subtract/move
+    uint64_t source_val=0;
+    if (inst.op2_type==OPERAND_TYPE_RAW) {
+        source_val=inst.num;
+    }else if (inst.op2_type == OPERAND_TYPE_REGISTER) {
+        //get the pointer to the source register
+        uint64_t *src_ptr = get_reg_ptr(c, inst.reg);
+        source_val = *src_ptr; //dereference the pointer to extract the actual number inside it
+    }
+
+
+    //overwriting the destination register, we do not do dest = source_val. we must dereference it: *dest = source_val. If it's ADD, we add source_val to *dest.
+    switch (inst.op) {
+        case MOV:
+            *dest = source_val;
+            break;
+        case ADD:
+            *dest += source_val;
+            break;
+        case SUB:
+            *dest -= source_val;
+            break;
+        default:
+            printf("Error: Unknown opcode.\n");
+            break;
+    }
+}
