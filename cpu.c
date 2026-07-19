@@ -124,8 +124,8 @@ void execute_instruction(struct cpu *c, struct instruction inst) {
         case JNE:
             if (c->zf ==false) {
                 c->rip=source_val;
-                break;
             }
+            break;
         default:
             printf("Error: Unknown opcode.\n");
             break;

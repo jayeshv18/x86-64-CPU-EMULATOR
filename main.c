@@ -63,7 +63,49 @@ struct instruction parse_line(char* line) {
     return inst;
 }
 
+struct cpu* init_cpu() {
+    //allocating the struct itself on the heap
+    struct cpu *c=malloc(sizeof(struct cpu));
+    if (!c) {
+        printf("Error allocating memory for cpu\n");
+        exit(1);
+    }
+
+    //allocating 1MB of virtual RAM on the heap
+    c->memory=malloc(1024*1024);
+    if (!c->memory) {
+        printf("Memory allocation failed\n");
+        free(c);
+        exit(1);
+    }
+
+    //clean and zero out all the registers to ensure clean state.
+    c->rax = 0; c->rbx = 0; c->rcx = 0; c->rdx = 0;
+    c->rsp = 0; c->rbp = 0; c->rip = 0;
+    c->zf = false; c->cf = false; c->sf = false; c->of = false;
+
+    return c;
+}
 int main(){
+    struct cpu *c=init_cpu();
+    char *program[] = {
+        "MOV RAX, 5",
+        "SUB RAX, 1",
+        "CMP RAX, 0",
+        "JNE 1",
+        "HLT"
+    };
+
+    while (true) {
+        char buffer[64];
+        //need a temporary string buffer because strtok destroys the string it parses
+        strcpy(buffer,program[c->rip]);//fetch
+        struct instruction inst=parse_line(buffer);//decode
+        c->rip++;//increment, before execute, so if the execute step is a JMP, the jump address isn't immediately overwritten on the next cycle.
+        execute_instruction(c,inst);//execute
+        printf("RAX:%lu\n",c->rax);//long unsigned
+        printf("RIP:%lu\n",c->rip);
+    }
 return 0;
 }
 
