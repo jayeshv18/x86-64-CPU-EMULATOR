@@ -16,7 +16,9 @@ typedef enum{
     CMP, // the code for CMP to JNE was added during building the control flow. The further explanations and details are added in the parser function.
     JMP,
     JE,
-    JNE
+    JNE,
+    PUSH,
+    POP
 }opcode;
 
 //need a way to represent the registers as integers so we aren't comparing strings later.

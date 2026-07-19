@@ -16,6 +16,8 @@ opcode string_to_opcode(const char* str) {
     if (strcmp(str,"JMP")==0) return JMP;
     if (strcmp(str,"JE")==0) return JE;
     if (strcmp(str,"JNE")==0) return JNE;
+    if (strcmp(str,"PUSH")==0) return PUSH;
+    if (strcmp(str,"POP")==0) return POP;
     return INVALID_OPCODE;
 }
 
@@ -64,6 +66,7 @@ struct instruction parse_line(char* line) {
 }
 
 struct cpu* init_cpu() {
+
     //allocating the struct itself on the heap
     struct cpu *c=malloc(sizeof(struct cpu));
     if (!c) {
@@ -78,6 +81,11 @@ struct cpu* init_cpu() {
         free(c);
         exit(1);
     }
+
+    //stack instruction initialization
+    //we subtract 8 so there is room for the first 8-byte push.
+    c->rsp=(1024*1024)-8;
+
 
     //clean and zero out all the registers to ensure clean state.
     c->rax = 0; c->rbx = 0; c->rcx = 0; c->rdx = 0;
@@ -135,7 +143,7 @@ int main(){
         input[strcspn(input, "\n")] = 0;
         if (strcmp(input, "step") == 0 || strcmp(input, "") == 0) {
             step_cpu(c, user_program);//if they type 'step' (or just press Enter), run one clock cycle
-            printf("[State] RAX: %lu | RIP: %lu | ZF: %d\n\n", c->rax, c->rip, c->zf);//print the new state, including the Zero Flag
+            printf("[State] RAX: %lu | RBX:%lu | RCX:%lu | RIP: %lu | ZF: %d\n\n", c->rax, c->rbx, c->rcx, c->rip, c->zf);//print the new state, including the Zero Flag
         }
         else if (strcmp(input, "exit") == 0) {
             printf("Powering down CPU...\n");
