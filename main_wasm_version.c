@@ -18,6 +18,8 @@ opcode string_to_opcode(const char* str) {
     if (strcmp(str,"JNE")==0) return JNE;
     if (strcmp(str,"PUSH")==0) return PUSH;
     if (strcmp(str,"POP")==0) return POP;
+    if (strcmp(str,"CALL")==0) return CALL;
+    if (strcmp(str,"RET")==0) return RET;
     return INVALID_OPCODE;
 }
 

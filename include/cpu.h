@@ -18,7 +18,9 @@ typedef enum{
     JE,
     JNE,
     PUSH,
-    POP
+    POP,
+    CALL,
+    RET
 }opcode;
 
 //need a way to represent the registers as integers so we aren't comparing strings later.

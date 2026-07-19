@@ -80,7 +80,7 @@ void execute_instruction(struct cpu *c, struct instruction inst) {
     }
     //allowing dest to be NULL only if the instruction is a Jump,
     //cause in JMP like JMP 5, the destination will be parsed as 5 but 5 is an integer we need to handle that.
-    if (dest==NULL && inst.op != JMP && inst.op != JE && inst.op != JNE) {
+    if (dest==NULL && inst.op != JMP && inst.op != JE && inst.op != JNE && inst.op != CALL && inst.op != RET) {
         printf("ERROR: Invalid destination register\n");
         return;
     }
@@ -142,6 +142,25 @@ void execute_instruction(struct cpu *c, struct instruction inst) {
             //shrink the stack (moves the pointer back up)
             c->rsp += 8;
             break;
+        case CALL: {
+            //push the current RIP to the stack
+            c->rsp -= 8;
+            uint64_t *stack_write_ptr = (uint64_t*)&(c->memory[c->rsp]);
+            *stack_write_ptr = c->rip;
+
+            //jump to the target address
+            c->rip = source_val;
+            break;
+        }
+        case RET: {
+            //pop the saved return address off the stack
+            uint64_t *stack_read_ptr = (uint64_t*)&(c->memory[c->rsp]);
+            //set RIP to that saved address
+            c->rip = *stack_read_ptr;
+            //shrink the stack
+            c->rsp += 8;
+            break;
+        }
         default:
             printf("Error: Unknown opcode.\n");
             break;
