@@ -86,26 +86,65 @@ struct cpu* init_cpu() {
 
     return c;
 }
+
+
+void step_cpu(struct cpu *c, char program[][64]) { //gives us 100 lines of code, with a maximum of 64 characters per line.
+    //need a block of writable memory where we can store strings typed by the user at runtime.
+    char buffer[64];
+    //fetch
+    strcpy(buffer, program[c->rip]);
+    printf("Executing: %s\n", buffer);
+    //decode
+    struct instruction inst = parse_line(buffer);
+    //increment RIP
+    c->rip++;
+    //execute
+    execute_instruction(c, inst);
+}
+
 int main(){
     struct cpu *c=init_cpu();
-    char *program[] = {
-        "MOV RAX, 5",
-        "SUB RAX, 1",
-        "CMP RAX, 0",
-        "JNE 1",
-        "HLT"
-    };
+    //allocate space for 100 lines of code, max 64 chars each
+    char user_program[100][64];
+    int instruction_count = 0;
+
+    printf("x86-64 Emulator: Program Loader\n");
+    printf("Enter your assembly code line by line.\n");
+    printf("Type 'DONE' when finished.\n\n");
+    printf("Type 'step' to run one cycle, or 'exit' to quit.\n");
+
+    char input[64];
+
+    while (instruction_count < 100) {
+        printf("x86-64 Emulator [%02d]> ", instruction_count); //prints [00]>, [01]>, etc.
+        if (fgets(user_program[instruction_count], 64, stdin) == NULL) break;
+        // Strip the newline character
+        user_program[instruction_count][strcspn(user_program[instruction_count], "\n")] = 0;
+        if (strcmp(user_program[instruction_count], "DONE") == 0) {
+            break;
+        }
+        instruction_count++;
+    }
+    printf("\nProgram loaded! %d instructions in memory.\n\n", instruction_count);
 
     while (true) {
-        char buffer[64];
-        //need a temporary string buffer because strtok destroys the string it parses
-        strcpy(buffer,program[c->rip]);//fetch
-        struct instruction inst=parse_line(buffer);//decode
-        c->rip++;//increment, before execute, so if the execute step is a JMP, the jump address isn't immediately overwritten on the next cycle.
-        execute_instruction(c,inst);//execute
-        printf("RAX:%lu\n",c->rax);//long unsigned
-        printf("RIP:%lu\n",c->rip);
+        printf("rootzero-dbg> ");
+        //wait for the user to type something
+        if (fgets(input, sizeof(input), stdin) == NULL) break;
+        //strip the newline character that fgets adds
+        input[strcspn(input, "\n")] = 0;
+        if (strcmp(input, "step") == 0 || strcmp(input, "") == 0) {
+            step_cpu(c, user_program);//if they type 'step' (or just press Enter), run one clock cycle
+            printf("[State] RAX: %lu | RIP: %lu | ZF: %d\n\n", c->rax, c->rip, c->zf);//print the new state, including the Zero Flag
+        }
+        else if (strcmp(input, "exit") == 0) {
+            printf("Powering down CPU...\n");
+            break;
+        }
+        else {
+            printf("Unknown command. Type 'step' or 'exit'.\n");
+        }
     }
-return 0;
+    return 0;
 }
 
