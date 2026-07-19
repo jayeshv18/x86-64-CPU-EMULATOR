@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>x86-64 Emulator Architecture</title>
+    <style>
+        /* CSS Variables for the Hardware Theme */
+        :root {
+            --neon-green: #00ff41;
+            --dark-bg: #0d0f12;
+            --glass-bg: rgba(20, 24, 30, 0.75);
+            --glass-border: rgba(0, 255, 65, 0.2);
+            --text-glow: 0 0 5px rgba(0, 255, 65, 0.5);
+            --panel-glow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 65, 0.1);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            /* Animated Circuit Grid Background */
+            background-image:
+                    linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            background-position: center center;
+            color: var(--neon-green);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: var(--text-glow);
+            margin-top: 40px;
+            font-size: 28px;
+        }
+
+        .container {
+            display: flex;
+            gap: 40px;
+            width: 90%;
+            max-width: 1200px;
+            margin-top: 20px;
+        }
+
+        /* The Antigravity Floating Panels */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: var(--panel-glow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Fake hardware traces at the top of panels */
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+            opacity: 0.5;
+        }
+
+        .editor-panel { flex: 1.2; }
+        .dashboard { flex: 0.8; display: flex; flex-direction: column; }
+
+        h3 {
+            margin-top: 0;
+            font-size: 14px;
+            color: #fff;
+            letter-spacing: 2px;
+            border-bottom: 1px dashed var(--glass-border);
+            padding-bottom: 10px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 300px;
+            background: rgba(0,0,0,0.6);
+            color: var(--neon-green);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 16px;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        textarea:focus {
+            box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.1);
+            border-color: var(--neon-green);
+        }
+
+        /* CPU Pinout Grid Design */
+        .cpu-die {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 2px solid #222;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .reg-box {
+            background: rgba(10, 20, 15, 0.8);
+            border: 1px solid var(--glass-border);
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+            border-radius: 4px;
+        }
+
+        .reg-name { font-weight: bold; color: #888; }
+        .reg-val { font-weight: bold; text-shadow: var(--text-glow); }
+
+        /* Control Buttons */
+        .controls { margin-top: 20px; display: flex; gap: 15px; }
+
+        button {
+            flex: 1;
+            background: transparent;
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+            border-radius: 4px;
+            padding: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--neon-green);
+            color: #000;
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        /* Hardware Status LED */
+        .status-container {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #222;
+            border-radius: 6px;
+        }
+
+        .led {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ffcc00; /* Booting color */
+            box-shadow: 0 0 10px #ffcc00;
+        }
+
+        #status-text { font-size: 14px; color: #aaa; }
+
+    </style>
+</head>
+<body>
+<h1>x86-64 Emulator Architecture V-CPU</h1>
+
+<div class="container">
+    <!-- LEFT: Code Editor -->
+    <div class="glass-panel editor-panel">
+        <h3>[ INSTRUCTION_MEM_BUFFER ]</h3>
+        <textarea id="code" spellcheck="false">MOV RAX, 10
+CALL 3
+HLT
+ADD RAX, 5
+RET</textarea>
+        <div class="controls">
+            <button onclick="loadProgram()">[ FLASH TO RAM ]</button>
+            <button onclick="stepProgram()">[ STEP CLOCK ]</button>
+        </div>
+    </div>
+
+    <!-- RIGHT: CPU Die Dashboard -->
+    <div class="glass-panel dashboard">
+        <h3>[ HARDWARE_REGISTERS ]</h3>
+
+        <div class="cpu-die">
+            <div class="reg-box"><span class="reg-name">RAX</span> <span class="reg-val" id="reg-rax">0</span></div>
+            <div class="reg-box"><span class="reg-name">RBX</span> <span class="reg-val" id="reg-rbx">0</span></div>
+            <div class="reg-box"><span class="reg-name">RCX</span> <span class="reg-val" id="reg-rcx">0</span></div>
+            <div class="reg-box"><span class="reg-name">RDX</span> <span class="reg-val" id="reg-rdx">0</span></div>
+            <div class="reg-box"><span class="reg-name">RSP</span> <span class="reg-val" id="reg-rsp">0</span></div>
+            <div class="reg-box"><span class="reg-name">RIP</span> <span class="reg-val" id="reg-rip">0</span></div>
+
+            <!-- Zero Flag gets a full row spanning 2 columns -->
+            <div class="reg-box" style="grid-column: span 2; border-color: #555;">
+                <span class="reg-name">FLAGS (ZF)</span> <span class="reg-val" id="reg-zf">0</span>
+            </div>
+        </div>
+
+        <div class="status-container">
+            <div class="led" id="status-led"></div>
+            <div id="status-text">Booting Wasm Subsystem...</div>
+        </div>
+    </div>
+</div>
+
+<!-- WebAssembly Bridge -->
+<script src="emulator.js"></script>
+<script>
+    const statusLed = document.getElementById('status-led');
+    const statusText = document.getElementById('status-text');
+
+    // Wasm Initialization
+    Module.onRuntimeInitialized = () => {
+        statusLed.style.background = "#00ff41";
+        statusLed.style.boxShadow = "0 0 10px #00ff41";
+        statusText.innerText = "SYS.ONLINE - Waiting for instructions.";
+        Module._init_emulator();
+        updateUI();
+    };
+
+    function loadProgram() {
+        Module._init_emulator();
+        const code = document.getElementById('code').value;
+        const lines = code.split('\n');
+
+        for (let i = 0; i < lines.length && i < 100; i++) {
+            const line = lines[i].trim();
+            if (line.length > 0) {
+                Module.ccall('load_instruction', null, ['number', 'string'], [i, line]);
+            }
+        }
+
+        statusLed.style.background = "#00ff41";
+        statusLed.style.boxShadow = "0 0 10px #00ff41";
+        statusText.innerText = `RAM.FLASHED - ${lines.length} instructions loaded.`;
+        updateUI();
+    }
+
+    function stepProgram() {
+        const status = Module._step_emulator();
+
+        if (status === 0) {
+            // Halted State (Red)
+            statusLed.style.background = "#ff003c";
+            statusLed.style.boxShadow = "0 0 15px #ff003c";
+            statusText.innerText = "SYS.HALTED - Execution complete.";
+        } else {
+            // Active Step (Pulse animation simulation)
+            statusLed.style.background = "#00b8ff";
+            statusLed.style.boxShadow = "0 0 15px #00b8ff";
+            statusText.innerText = "SYS.ACTIVE - Clock cycle advanced.";
+        }
+        updateUI();
+    }
+
+    function updateUI() {
+        document.getElementById('reg-rax').innerText = Module._get_rax();
+        document.getElementById('reg-rbx').innerText = Module._get_rbx();
+        document.getElementById('reg-rcx').innerText = Module._get_rcx();
+        document.getElementById('reg-rdx').innerText = Module._get_rdx();
+
+        // Format pointers in Hex so they look like actual memory addresses!
+        document.getElementById('reg-rsp').innerText = "0x" + Module._get_rsp().toString(16).toUpperCase();
+        document.getElementById('reg-rip').innerText = "0x" + Module._get_rip().toString(16).toUpperCase();
+
+        document.getElementById('reg-zf').innerText = Module._get_zf();
+    }
+</script>
+</body>
+</html>

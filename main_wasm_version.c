@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+
 //function that takes a string and returns opcode enum.
 //function to recognize these string commands.
 opcode string_to_opcode(const char* str) {
@@ -157,4 +159,3 @@ int main(){
     }
     return 0;
 }
-

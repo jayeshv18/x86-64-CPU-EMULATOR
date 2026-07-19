@@ -126,14 +126,15 @@ void execute_instruction(struct cpu *c, struct instruction inst) {
                 c->rip=source_val;
             }
             break;
-        case PUSH:
+        case PUSH: {
             //grow the stack downward by 8 bytes
             c->rsp -= 8;
             //treat the memory at c->rsp as a 64-bit integer pointer
             uint64_t *stack_write_ptr = (uint64_t*)&(c->memory[c->rsp]);
             *stack_write_ptr = *dest; //write the value into RAM
             break;
-        case POP:
+        }
+        case POP: {
             //get a 64-bit pointer to the current top of the stack
             uint64_t *stack_read_ptr = (uint64_t*)&(c->memory[c->rsp]);
             //read the value and put it into the destination register
@@ -142,6 +143,7 @@ void execute_instruction(struct cpu *c, struct instruction inst) {
             //shrink the stack (moves the pointer back up)
             c->rsp += 8;
             break;
+        }
         case CALL: {
             //push the current RIP to the stack
             c->rsp -= 8;
