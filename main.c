@@ -131,6 +131,31 @@ uint64_t* get_reg_ptr(struct cpu *c, cpu_register reg) {
     }
 }
 
+//the x86-64 architecture, instructions like ADD and SUB automatically update these flags based on the mathematical result. (Note: MOV does not update flags it just moves data).
+void update_flags(struct cpu *c, uint64_t result) {
+    //zero flag, true if the result of the operation is exactly 0.
+    c->zf=(result==0);
+    /*  explanation of the above one line code.
+    if (result==0){
+        c->zf=true;
+    }else {
+        c->zf=false;
+    }
+    */
+
+    //sign flag, true if the result is negative. In a 64-bit integer, the highest bit (the 63rd bit) is the "sign bit". If it is 1, the number is negative.
+    //bit-shift the result 63 places to the right, and use bitwise AND.
+    /*
+    shifting right (>>) by 63 places, we are pushing all the other 63 bits off the right edge and disappearing them,
+    leaving Bit 63 sitting perfectly in the 1st position (Bit 0).
+
+    & 1 acts as a mask. It forces every other bit in the number to become 0, ensuring that you isolate only that single bit that you just shifted into the first position.
+    if the result was negative, c->sf becomes 1 (True).
+    if the result was positive, c->sf becomes 0 (False).
+     */
+    c->sf=(result>>63)&1;
+}
+
 void execute_instruction(struct cpu *c, struct instruction inst) {
     uint64_t *dest = get_reg_ptr(c, inst.dest_reg); //get_reg_ptr() to get the memory address of the destination register.
     //if HLT was called or an invalid register was passed,
@@ -162,9 +187,11 @@ void execute_instruction(struct cpu *c, struct instruction inst) {
             break;
         case ADD:
             *dest += source_val;
+            update_flags(c, *dest);
             break;
         case SUB:
             *dest -= source_val;
+            update_flags(c, *dest);
             break;
         default:
             printf("Error: Unknown opcode.\n");
