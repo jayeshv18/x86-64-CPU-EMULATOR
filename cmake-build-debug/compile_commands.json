@@ -1,8 +1,26 @@
 [
 {
   "directory": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug",
-  "command": "/usr/bin/cc -g -std=gnu11 -fdiagnostics-color=always -o CMakeFiles/x86_64_Emulator.dir/main.c.o -c \"/home/jay/CLionProjects/x86-64 Emulator/main.c\"",
-  "file": "/home/jay/CLionProjects/x86-64 Emulator/main.c",
-  "output": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug/CMakeFiles/x86_64_Emulator.dir/main.c.o"
+  "command": "/usr/bin/cc -g -std=gnu11 -fdiagnostics-color=always -o CMakeFiles/x86_64_Emulator.dir/main_wasm_version.c.o -c \"/home/jay/CLionProjects/x86-64 Emulator/main_wasm_version.c\"",
+  "file": "/home/jay/CLionProjects/x86-64 Emulator/main_wasm_version.c",
+  "output": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug/CMakeFiles/x86_64_Emulator.dir/main_wasm_version.c.o"
+},
+{
+  "directory": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug",
+  "command": "/usr/bin/cc -g -std=gnu11 -fdiagnostics-color=always -o CMakeFiles/x86_64_Emulator.dir/cpu.c.o -c \"/home/jay/CLionProjects/x86-64 Emulator/cpu.c\"",
+  "file": "/home/jay/CLionProjects/x86-64 Emulator/cpu.c",
+  "output": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug/CMakeFiles/x86_64_Emulator.dir/cpu.c.o"
+},
+{
+  "directory": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug",
+  "command": "/usr/bin/cc -g -std=gnu11 -fdiagnostics-color=always -o CMakeFiles/x86_64_Emulator.dir/main_terminal_hardcoded_version.c.o -c \"/home/jay/CLionProjects/x86-64 Emulator/main_terminal_hardcoded_version.c\"",
+  "file": "/home/jay/CLionProjects/x86-64 Emulator/main_terminal_hardcoded_version.c",
+  "output": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug/CMakeFiles/x86_64_Emulator.dir/main_terminal_hardcoded_version.c.o"
+},
+{
+  "directory": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug",
+  "command": "/usr/bin/cc -g -std=gnu11 -fdiagnostics-color=always -o CMakeFiles/x86_64_Emulator.dir/emsdk/main_wasm_emscripten_version.c.o -c \"/home/jay/CLionProjects/x86-64 Emulator/emsdk/main_wasm_emscripten_version.c\"",
+  "file": "/home/jay/CLionProjects/x86-64 Emulator/emsdk/main_wasm_emscripten_version.c",
+  "output": "/home/jay/CLionProjects/x86-64 Emulator/cmake-build-debug/CMakeFiles/x86_64_Emulator.dir/emsdk/main_wasm_emscripten_version.c.o"
 }
 ]

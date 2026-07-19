@@ -1,0 +1,24 @@
+# JetBrains IDE (CLion)
+.idea/
+cmake-build-*/
+
+# Native C Compiled Executables & Objects
+*.o
+*.out
+emulator
+emulator.exe
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Emscripten Toolchain (DO NOT commit the SDK)
+emsdk/
+.emscripten
+.emscripten_cache/
+.emscripten_ports/

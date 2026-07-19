@@ -136,5 +136,15 @@ EMSCRIPTEN_KEEPALIVE int get_rbx() { return (int)global_cpu->rbx; }
 EMSCRIPTEN_KEEPALIVE int get_rcx() { return (int)global_cpu->rcx; }
 EMSCRIPTEN_KEEPALIVE int get_rdx() { return (int)global_cpu->rdx; }
 EMSCRIPTEN_KEEPALIVE int get_rsp() { return (int)global_cpu->rsp; }
+EMSCRIPTEN_KEEPALIVE int get_rbp() { return (int)global_cpu->rbp; }
 EMSCRIPTEN_KEEPALIVE int get_rip() { return (int)global_cpu->rip; }
 EMSCRIPTEN_KEEPALIVE int get_zf()  { return global_cpu->zf ? 1 : 0; }
+EMSCRIPTEN_KEEPALIVE int get_cf()  { return global_cpu->cf ? 1 : 0; }
+EMSCRIPTEN_KEEPALIVE int get_sf()  { return global_cpu->sf ? 1 : 0; }
+EMSCRIPTEN_KEEPALIVE int get_of()  { return global_cpu->of ? 1 : 0; }
+
+EMSCRIPTEN_KEEPALIVE
+uint8_t* get_memory_ptr() {
+    if (global_cpu == NULL) return NULL;
+    return global_cpu->memory;
+}

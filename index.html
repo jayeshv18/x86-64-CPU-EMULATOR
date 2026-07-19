@@ -2,285 +2,2187 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>x86-64 Emulator Architecture</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>x86-64 Architecture</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
-        /* CSS Variables for the Hardware Theme */
         :root {
             --neon-green: #00ff41;
             --dark-bg: #0d0f12;
-            --glass-bg: rgba(20, 24, 30, 0.75);
-            --glass-border: rgba(0, 255, 65, 0.2);
+            --panel-bg: rgba(13, 20, 25, 0.65);
+            --panel-border: rgba(0, 255, 65, 0.16);
+            --panel-glow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 65, 0.05);
             --text-glow: 0 0 5px rgba(0, 255, 65, 0.5);
-            --panel-glow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 65, 0.1);
+            
+            --neon-cyan: #00f0ff;
+            --neon-yellow: #ffaa00;
+            --neon-pink: #ff0055;
+            --text-primary: #f8fafc;
+            --text-secondary: #8899a8;
+            --font-mono: 'Fira Code', 'Courier New', monospace;
+            --font-sans: 'Inter', sans-serif;
+            --font-display: 'Outfit', sans-serif;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 65, 0.1);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--neon-green);
+            box-shadow: 0 0 8px var(--neon-green);
         }
 
         body {
             background-color: var(--dark-bg);
-            /* Animated Circuit Grid Background */
-            background-image:
-                    linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(0, 255, 65, 0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
-            background-position: center center;
-            color: var(--neon-green);
-            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
             margin: 0;
+            padding: 0;
             min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body.loading {
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Preloader Screen */
+        .loader-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #06080a;
+            z-index: 99999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .progress-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring__circle {
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.1s;
+        }
+
+        #loader-percent {
+            position: absolute;
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--neon-green);
+            font-family: var(--font-mono);
+            text-shadow: var(--text-glow);
+        }
+
+        .loader-status {
+            font-size: 11px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #55665b;
+            margin-bottom: 6px;
+        }
+
+        .loader-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--neon-green) 0%, #00bb30 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(0, 255, 65, 0.15));
+            margin-bottom: 30px;
+        }
+
+        .skip-btn {
+            background: rgba(0, 255, 65, 0.03);
+            border: 1px solid rgba(0, 255, 65, 0.1);
+            color: var(--neon-green);
+            padding: 10px 20px;
+            font-size: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+            font-family: var(--font-sans);
+        }
+
+        .skip-btn.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .skip-btn:hover {
+            background: rgba(0, 255, 65, 0.08);
+            border-color: var(--neon-green);
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+        }
+
+        /* Scroll Animation Hero Section */
+        .scroll-wrapper {
+            position: relative;
+            width: 100%;
+            height: 500vh; /* scroll track depth */
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #000000;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        /* Scroll Overlays text */
+        .overlay-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%;
+            max-width: 750px;
+            text-align: center;
+            z-index: 10;
+            opacity: 0;
+            pointer-events: none;
+            font-family: var(--font-display);
+            will-change: transform, opacity;
+        }
+
+        .overlay-text h1 {
+            font-size: clamp(2.3rem, 6.5vw, 4.5rem);
+            font-weight: 800;
+            letter-spacing: 2px;
+            margin: 0 0 15px 0;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .overlay-text h2 {
+            font-size: clamp(2rem, 5.5vw, 3.5rem);
+            font-weight: 800;
+            letter-spacing: 1px;
+            margin: 0 0 15px 0;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--neon-green) 0%, #00bb30 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 15px rgba(0, 255, 65, 0.2));
+        }
+
+        .overlay-text p {
+            font-family: var(--font-sans);
+            font-size: clamp(0.95rem, 1.8vw, 1.25rem);
+            font-weight: 300;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .intro-text {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+        }
+
+        .scroll-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 40px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: #44554b;
+            animation: indicator-bounce 2s infinite;
+        }
+
+        @keyframes indicator-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
+        }
+
+        .mouse-icon {
+            width: 18px;
+            height: 28px;
+            border: 2px solid #44554b;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .mouse-icon .wheel {
+            width: 3px;
+            height: 6px;
+            background: #44554b;
+            border-radius: 1px;
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: wheel-scroll 1.6s infinite;
+        }
+
+        @keyframes wheel-scroll {
+            0% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, 8px); }
+        }
+
+        /* ---------------------------------------------------- */
+        /* SECTION 2: CPU EMULATOR LAB WORKBENCH */
+        /* ---------------------------------------------------- */
+        .emulator-lab-section {
+            position: relative;
+            background-color: var(--dark-bg);
+            background-image: 
+                linear-gradient(rgba(0, 255, 65, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 65, 0.02) 1px, transparent 1px);
+            background-size: 30px 30px;
+            z-index: 100;
+            border-top: 1px solid var(--panel-border);
+            box-shadow: 0 -15px 40px rgba(0, 0, 0, 0.9);
+            padding-bottom: 50px;
+        }
+
+        /* Header Style */
+        .app-header {
+            background: rgba(13, 15, 18, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 12px 4%;
+            position: sticky;
+            top: 0;
+            z-index: 110;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1600px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .pulse-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--neon-green);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 14px var(--neon-green); }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 22px;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--neon-green) 0%, #00bb30 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 12px rgba(0, 255, 65, 0.15));
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 6px 14px;
+            border-radius: 30px;
+            border: 1px solid var(--panel-border);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge .led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ffcc00;
+            box-shadow: 0 0 8px #ffcc00;
+            transition: all 0.3s ease;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .cycle-counter {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-primary);
+            background: rgba(0, 255, 65, 0.04);
+            border: 1px solid rgba(0, 255, 65, 0.2);
+            padding: 6px 14px;
+            border-radius: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .cycle-counter span {
+            color: var(--neon-green);
+            font-weight: 700;
+        }
+
+        .speed-control {
+            display: flex;
+            flex-direction: column;
+            font-size: 10px;
+            color: var(--text-secondary);
+            min-width: 140px;
+        }
+
+        .speed-control label {
+            margin-bottom: 4px;
+            font-family: var(--font-display);
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .speed-control label span {
+            color: var(--neon-green);
+            font-weight: 700;
+        }
+
+        .speed-control input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.15);
+            outline: none;
+        }
+
+        .speed-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--neon-green);
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--neon-green);
+            transition: transform 0.1s;
+        }
+
+        .speed-control input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 1.2fr 1.15fr;
+            gap: 20px;
+            width: 95%;
+            max-width: 1650px;
+            margin: 25px auto 0 auto;
+            position: relative;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 1280px) {
+            .dashboard-grid {
+                grid-template-columns: 1.2fr 1fr;
+            }
+            .panel-right {
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 850px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            .panel-ide, .panel-center, .panel-right {
+                grid-column: span 1;
+            }
+        }
+
+        /* Glassmorphic Panels */
+        .glass-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--panel-glow);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(0, 255, 65, 0.25);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.85), 0 0 30px rgba(0, 255, 65, 0.06);
+        }
+
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
+            opacity: 0.35;
+        }
+
+        .glass-panel h2 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-family: var(--font-display);
+            font-size: 13px;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            border-bottom: 1px dashed var(--panel-border);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        /* Template Library Cards */
+        .template-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .template-card {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            box-sizing: border-box;
+        }
+
+        .template-card:hover {
+            background: rgba(0, 255, 65, 0.03);
+            border-color: rgba(0, 255, 65, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 255, 65, 0.06);
+        }
+
+        .template-card.active {
+            background: rgba(0, 255, 65, 0.08);
+            border-color: var(--neon-green);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.12);
+        }
+
+        .template-card .card-title {
+            font-family: var(--font-display);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.5px;
+        }
+
+        .template-card .card-desc {
+            font-size: 9px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            line-height: 1.35;
+        }
+
+        /* Textarea Editor Style */
+        .editor-container {
+            width: 100%;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid var(--panel-border);
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: transparent;
+            color: var(--neon-green);
+            border: none;
+            padding: 15px;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            line-height: 1.5;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+            tab-size: 4;
+        }
+
+        /* Buttons Control Bar */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        button {
+            background: rgba(0, 255, 65, 0.03);
+            color: var(--neon-green);
+            border: 1px solid rgba(0, 255, 65, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            transition: all 0.25s ease;
+            box-sizing: border-box;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--neon-green);
+            color: #0d0f12;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.45);
+            border-color: var(--neon-green);
+        }
+
+        button:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+            border-color: rgba(255, 255, 255, 0.04);
+            color: var(--text-secondary);
+        }
+
+        button#btn-run.running {
+            background: rgba(255, 0, 85, 0.1);
+            color: var(--neon-pink);
+            border-color: rgba(255, 0, 85, 0.3);
+        }
+
+        button#btn-run.running:hover {
+            background: var(--neon-pink);
+            color: #060814;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.45);
+            border-color: var(--neon-pink);
+        }
+
+        /* RAM Instruction Panel */
+        .rom-list {
+            max-height: 120px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.45);
+            border-radius: 10px;
+            border: 1px solid var(--panel-border);
+            padding: 6px;
+        }
+
+        .rom-placeholder {
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-align: center;
+            padding: 16px;
+            font-style: italic;
+        }
+
+        .rom-line {
+            display: flex;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            margin-bottom: 2px;
+            color: rgba(255, 255, 255, 0.45);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .rom-line:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .rom-line.active-rip {
+            background: rgba(0, 255, 65, 0.08);
+            color: var(--neon-green);
+            font-weight: 600;
+            box-shadow: inset 3px 0 0 var(--neon-green);
+            padding-left: 12px;
+        }
+
+        .rom-line.halted {
+            box-shadow: inset 3px 0 0 var(--neon-pink);
+            color: var(--neon-pink);
+            background: rgba(255, 0, 85, 0.06);
+        }
+
+        .rom-idx {
+            width: 30px;
+            color: rgba(255, 255, 255, 0.2);
+            text-align: right;
+            margin-right: 15px;
+            user-select: none;
+        }
+
+        .rom-inst {
+            flex-grow: 1;
+        }
+
+        /* SVG Architecture Panel */
+        .datapath-panel {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .svg-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px 0;
+            box-sizing: border-box;
+            background: rgba(0,0,0,0.25);
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+        }
+
+        .svg-element {
+            width: 100%;
+            height: auto;
+            max-width: 520px;
+        }
+
+        /* SVG Internal Components */
+        .svg-block-shape {
+            fill: #090b0e;
+            stroke: rgba(0, 255, 65, 0.25);
+            stroke-width: 1.5;
+            rx: 6px;
+            ry: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .svg-alu-shape {
+            fill: #090b0e;
+            stroke: rgba(0, 255, 65, 0.25);
+            stroke-width: 1.5;
+            transition: all 0.3s ease;
+        }
+
+        /* Glowing block selections */
+        .block-active-cyan .svg-block-shape {
+            stroke: var(--neon-cyan);
+            fill: rgba(0, 240, 255, 0.08);
+            filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.35));
+        }
+
+        .block-active-green .svg-block-shape,
+        .block-active-green .svg-alu-shape {
+            stroke: var(--neon-green);
+            fill: rgba(0, 255, 65, 0.08);
+            filter: drop-shadow(0 0 6px rgba(0, 255, 65, 0.35));
+        }
+
+        .block-active-pink .svg-block-shape {
+            stroke: var(--neon-pink);
+            fill: rgba(255, 0, 85, 0.08);
+            filter: drop-shadow(0 0 6px rgba(255, 0, 85, 0.35));
+        }
+
+        .block-active-yellow .svg-block-shape {
+            stroke: var(--neon-yellow);
+            fill: rgba(255, 170, 0, 0.08);
+            filter: drop-shadow(0 0 6px rgba(255, 170, 0, 0.35));
+        }
+
+        .svg-text {
+            fill: var(--text-secondary);
+            font-family: var(--font-sans);
+            font-size: 10px;
+        }
+
+        .svg-text-bold {
+            fill: var(--text-primary);
+            font-family: var(--font-display);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .svg-label {
+            fill: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 500;
+        }
+
+        .svg-val {
+            fill: var(--neon-green);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 600;
+            transition: fill 0.3s;
+            text-shadow: var(--text-glow);
+        }
+
+        /* SVG LEDs */
+        .svg-led-off {
+            fill: #111a14;
+            stroke: rgba(0, 255, 65, 0.1);
+            stroke-width: 1;
+            transition: all 0.3s;
+        }
+
+        .svg-led-active-green {
+            fill: var(--neon-green);
+            stroke: #fff;
+            stroke-width: 0.5;
+            filter: drop-shadow(0 0 4px var(--neon-green));
+        }
+        .svg-led-active-cyan {
+            fill: var(--neon-cyan);
+            stroke: #fff;
+            stroke-width: 0.5;
+            filter: drop-shadow(0 0 4px var(--neon-cyan));
+        }
+        .svg-led-active-yellow {
+            fill: var(--neon-yellow);
+            stroke: #fff;
+            stroke-width: 0.5;
+            filter: drop-shadow(0 0 4px var(--neon-yellow));
+        }
+        .svg-led-active-red {
+            fill: var(--neon-pink);
+            stroke: #fff;
+            stroke-width: 0.5;
+            filter: drop-shadow(0 0 4px var(--neon-pink));
+        }
+
+        /* SVG Bus Lines */
+        .svg-bus {
+            fill: none;
+            stroke: rgba(0, 255, 65, 0.08);
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: stroke 0.3s, filter 0.3s;
+        }
+
+        .bus-active-cyan {
+            stroke: var(--neon-cyan);
+            stroke-dasharray: 6, 6;
+            animation: bus-flow 0.8s linear infinite;
+            filter: drop-shadow(0 0 3px var(--neon-cyan));
+        }
+        .bus-active-green {
+            stroke: var(--neon-green);
+            stroke-dasharray: 6, 6;
+            animation: bus-flow 0.8s linear infinite;
+            filter: drop-shadow(0 0 3px var(--neon-green));
+        }
+        .bus-active-yellow {
+            stroke: var(--neon-yellow);
+            stroke-dasharray: 6, 6;
+            animation: bus-flow 0.8s linear infinite;
+            filter: drop-shadow(0 0 3px var(--neon-yellow));
+        }
+        .bus-active-pink {
+            stroke: var(--neon-pink);
+            stroke-dasharray: 6, 6;
+            animation: bus-flow 0.8s linear infinite;
+            filter: drop-shadow(0 0 3px var(--neon-pink));
+        }
+
+        @keyframes bus-flow {
+            to { stroke-dashoffset: -24; }
+        }
+
+        /* Register Dashboard Grid */
+        .registers-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .reg-box {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .reg-box::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 10%; bottom: 10%; width: 2px;
+            background: transparent;
+            transition: background 0.3s;
+        }
+
+        .reg-box:hover {
+            background: rgba(0, 255, 65, 0.02);
+            border-color: rgba(0, 255, 65, 0.3);
+        }
+
+        .reg-box.active-pulse {
+            animation: reg-pulse 0.8s ease-out;
+        }
+
+        .reg-box.active-pulse::before {
+            background: var(--neon-green);
+        }
+
+        .reg-box.pointer-reg.active-pulse::before {
+            background: var(--neon-cyan);
+        }
+
+        @keyframes reg-pulse {
+            0% { box-shadow: 0 0 0 rgba(0, 255, 65, 0); border-color: var(--neon-green); }
+            30% { box-shadow: 0 0 15px rgba(0, 255, 65, 0.25); border-color: var(--neon-green); }
+            100% { box-shadow: 0 0 0 rgba(0, 255, 65, 0); border-color: var(--panel-border); }
+        }
+
+        .reg-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .reg-sub {
+            font-family: var(--font-sans);
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.2);
+            text-transform: uppercase;
+            font-weight: 400;
+        }
+
+        .reg-val {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--neon-green);
+            margin-top: 5px;
+            word-break: break-all;
+            text-shadow: var(--text-glow);
+        }
+
+        .pointer-reg {
+            grid-column: span 1;
+        }
+        .pointer-reg .reg-val {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 5px rgba(0, 240, 255, 0.3);
+        }
+
+        /* CPU Flags Header and Grid */
+        .flags-header {
+            margin-top: 20px;
+            font-family: var(--font-display);
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            border-bottom: 1px dashed var(--panel-border);
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .flags-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .flag-led-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--panel-border);
+            padding: 8px 4px;
+            border-radius: 8px;
+        }
+
+        .led-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #111a14;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
+            margin-bottom: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .flag-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
-        h1 {
+        .flag-desc {
+            font-size: 7px;
+            color: rgba(255, 255, 255, 0.25);
+            margin-top: 1px;
             text-transform: uppercase;
-            letter-spacing: 4px;
-            text-shadow: var(--text-glow);
-            margin-top: 40px;
-            font-size: 28px;
         }
 
-        .container {
+        #flag-zf.active { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green), inset 0 1px 1px #fff; }
+        #flag-cf.active { background: var(--neon-cyan); box-shadow: 0 0 8px var(--neon-cyan), inset 0 1px 1px #fff; }
+        #flag-sf.active { background: var(--neon-yellow); box-shadow: 0 0 8px var(--neon-yellow), inset 0 1px 1px #fff; }
+        #flag-of.active { background: var(--neon-pink); box-shadow: 0 0 8px var(--neon-pink), inset 0 1px 1px #fff; }
+
+        /* Stack Visualizer */
+        .stack-meta {
             display: flex;
-            gap: 40px;
-            width: 90%;
-            max-width: 1200px;
-            margin-top: 20px;
+            justify-content: space-between;
+            font-size: 9px;
+            font-family: var(--font-display);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: rgba(255, 255, 255, 0.25);
+            margin-bottom: 6px;
+            padding: 0 10px;
         }
 
-        /* The Antigravity Floating Panels */
-        .glass-panel {
-            background: var(--glass-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: var(--panel-glow);
-            position: relative;
-            overflow: hidden;
+        .stack-list {
+            max-height: 220px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.45);
+            border-radius: 10px;
+            border: 1px solid var(--panel-border);
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Fake hardware traces at the top of panels */
-        .glass-panel::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; height: 3px;
-            background: linear-gradient(90deg, transparent, var(--neon-green), transparent);
-            opacity: 0.5;
-        }
-
-        .editor-panel { flex: 1.2; }
-        .dashboard { flex: 0.8; display: flex; flex-direction: column; }
-
-        h3 {
-            margin-top: 0;
-            font-size: 14px;
-            color: #fff;
-            letter-spacing: 2px;
-            border-bottom: 1px dashed var(--glass-border);
-            padding-bottom: 10px;
-        }
-
-        textarea {
-            width: 100%;
-            height: 300px;
-            background: rgba(0,0,0,0.6);
-            color: var(--neon-green);
-            border: 1px solid var(--glass-border);
+        .stack-slot {
+            display: flex;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            padding: 7px 10px;
             border-radius: 6px;
-            padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 16px;
-            resize: vertical;
-            outline: none;
+            margin-bottom: 4px;
+            color: rgba(255, 255, 255, 0.45);
+            border: 1px solid transparent;
+            transition: all 0.25s ease;
+            align-items: center;
             box-sizing: border-box;
         }
 
-        textarea:focus {
-            box-shadow: inset 0 0 10px rgba(0, 255, 65, 0.1);
-            border-color: var(--neon-green);
-        }
-
-        /* CPU Pinout Grid Design */
-        .cpu-die {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 25px;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.4);
-            border: 2px solid #222;
-            border-radius: 8px;
-            position: relative;
-        }
-
-        .reg-box {
-            background: rgba(10, 20, 15, 0.8);
-            border: 1px solid var(--glass-border);
-            padding: 10px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 15px;
-            border-radius: 4px;
-        }
-
-        .reg-name { font-weight: bold; color: #888; }
-        .reg-val { font-weight: bold; text-shadow: var(--text-glow); }
-
-        /* Control Buttons */
-        .controls { margin-top: 20px; display: flex; gap: 15px; }
-
-        button {
-            flex: 1;
-            background: transparent;
-            color: var(--neon-green);
-            border: 1px solid var(--neon-green);
-            border-radius: 4px;
-            padding: 12px;
-            cursor: pointer;
-            font-weight: bold;
-            font-family: monospace;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s ease;
-        }
-
-        button:hover {
-            background: var(--neon-green);
-            color: #000;
-            box-shadow: 0 0 15px var(--neon-green);
-        }
-
-        /* Hardware Status LED */
-        .status-container {
-            margin-top: auto;
+        .stack-addr {
+            width: 85px;
+            font-weight: 600;
+            color: var(--text-secondary);
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 15px;
-            background: rgba(0,0,0,0.5);
-            border: 1px solid #222;
-            border-radius: 6px;
         }
 
-        .led {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ffcc00; /* Booting color */
-            box-shadow: 0 0 10px #ffcc00;
+        .stack-val-hex {
+            flex-grow: 1;
+            text-align: right;
+            color: var(--text-primary);
+            margin-right: 15px;
         }
 
-        #status-text { font-size: 14px; color: #aaa; }
+        .stack-val-dec {
+            width: 45px;
+            text-align: right;
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 9.5px;
+        }
 
+        .stack-slot.active-rsp {
+            border-color: rgba(0, 240, 255, 0.2);
+            background: rgba(0, 240, 255, 0.04);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.03);
+        }
+
+        .stack-slot.active-rsp .stack-addr {
+            color: var(--neon-cyan);
+        }
+
+        .stack-slot.active-rbp {
+            border-color: rgba(255, 170, 0, 0.2);
+            background: rgba(255, 170, 0, 0.04);
+        }
+
+        .stack-slot.active-rbp .stack-addr {
+            color: var(--neon-yellow);
+        }
+
+        .stack-slot.active-rsp.active-rbp {
+            border-color: rgba(0, 255, 102, 0.2);
+            background: rgba(0, 255, 102, 0.04);
+        }
+
+        .stack-slot.active-rsp.active-rbp .stack-addr {
+            color: var(--neon-green);
+        }
+
+        .badge {
+            font-family: var(--font-sans);
+            font-size: 7px;
+            font-weight: 700;
+            padding: 1px 3px;
+            border-radius: 3px;
+            margin-left: 5px;
+            text-transform: uppercase;
+        }
+        .badge-rsp { background: rgba(0, 240, 255, 0.12); color: var(--neon-cyan); border: 1px solid rgba(0, 240, 255, 0.25); }
+        .badge-rbp { background: rgba(255, 170, 0, 0.12); color: var(--neon-yellow); border: 1px solid rgba(255, 170, 0, 0.25); }
+        .badge-both { background: rgba(0, 255, 102, 0.12); color: var(--neon-green); border: 1px solid rgba(0, 255, 102, 0.25); }
+
+        /* Log Panel styling */
+        .log-console {
+            height: 100px;
+            overflow-y: auto;
+            background: #06080b;
+            border-radius: 10px;
+            border: 1px solid var(--panel-border);
+            padding: 8px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            line-height: 1.45;
+            box-sizing: border-box;
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            color: var(--text-secondary);
+        }
+        .log-entry.system-msg { color: var(--text-secondary); opacity: 0.6; }
+        .log-entry.info-msg { color: var(--neon-cyan); }
+        .log-entry.success-msg { color: var(--neon-green); }
+        .log-entry.warn-msg { color: var(--neon-yellow); }
+        .log-entry.error-msg { color: var(--neon-pink); font-weight: 600; }
     </style>
 </head>
-<body>
-<h1>x86-64 Emulator Architecture V-CPU</h1>
+<body class="loading">
 
-<div class="container">
-    <!-- LEFT: Code Editor -->
-    <div class="glass-panel editor-panel">
-        <h3>[ INSTRUCTION_MEM_BUFFER ]</h3>
-        <textarea id="code" spellcheck="false">MOV RAX, 10
+    <!-- Loading Screen -->
+    <div class="loader-overlay" id="loader">
+        <div class="progress-container">
+            <svg class="progress-ring" width="120" height="120">
+                <circle class="progress-ring__background" stroke="rgba(0, 255, 65, 0.04)" stroke-width="5" fill="transparent" r="48" cx="60" cy="60" />
+                <circle class="progress-ring__circle" stroke="#00ff41" stroke-width="5" fill="transparent" r="48" cx="60" cy="60" />
+            </svg>
+            <div id="loader-percent">0%</div>
+        </div>
+        <div class="loader-status">Booting x86-64 Subsystems</div>
+        <div class="loader-title">x86-64 Architecture V-CPU</div>
+        <button class="skip-btn" id="skip-btn" onclick="skipLoading()">[ SKIP LOADING ]</button>
+    </div>
+
+    <!-- SECTION 1: Scroll-Linked Image Sequence -->
+    <div class="scroll-wrapper">
+        <div class="canvas-container">
+            <canvas id="scroll-canvas"></canvas>
+
+            <!-- Overlapping Text Elements -->
+            <div class="overlay-text intro-text">
+                <h1>x86-64 SILICON</h1>
+                <p>Scroll down to scrub through the processor architecture</p>
+                <div class="scroll-indicator">
+                    <div class="mouse-icon"><span class="wheel"></span></div>
+                    <span>SCROLL DOWN</span>
+                </div>
+            </div>
+
+            <div class="overlay-text text-1">
+                <h2>x86-64 PIPELINE</h2>
+                <p>Advanced instruction fetching and hardware microcode decoding</p>
+            </div>
+
+            <div class="overlay-text text-2">
+                <h2>1MB VIRTUAL STACK RAM</h2>
+                <p>Real-time memory operations with automated stack pointer tracking</p>
+            </div>
+
+            <div class="overlay-text text-3">
+                <h2>x86-64 INSTRUCTION SET</h2>
+                <p>Interactive compiler workbench with procedural control flow animations</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: CPU Emulator Workbench -->
+    <div class="emulator-lab-section">
+        <header class="app-header">
+            <div class="header-content">
+                <div class="brand">
+                    <span class="pulse-dot"></span>
+                    <h1>x86-64 Architecture V-CPU</h1>
+                </div>
+                <div class="status-badge" id="cpu-status-badge">
+                    <span class="led" id="status-led"></span>
+                    <span id="status-text">Booting WebAssembly Subsystem...</span>
+                </div>
+                <div class="header-controls">
+                    <div class="cycle-counter">CYCLES: <span id="cycle-count">0</span></div>
+                    <div class="speed-control">
+                        <label for="speed-slider">CLOCK SPEED: <span id="speed-val">500</span>ms</label>
+                        <input type="range" id="speed-slider" min="100" max="2000" value="500" oninput="updateSpeedVal(this.value)">
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- LEFT: IDE and Templates -->
+            <section class="grid-col panel-ide">
+                <div class="glass-panel">
+                    <h2>[ TEMPLATE_PROGRAM_LIBRARIES ]</h2>
+                    <div class="template-cards">
+                        <div class="template-card active" id="card-loop" onclick="loadTemplate('loop')">
+                            <div class="card-title">Loop Counter</div>
+                            <div class="card-desc">Increments RAX until RAX == RBX (5)</div>
+                        </div>
+                        <div class="template-card" id="card-fib" onclick="loadTemplate('fib')">
+                            <div class="card-title">Fibonacci</div>
+                            <div class="card-desc">Generates 10 terms of Fibonacci sequence</div>
+                        </div>
+                        <div class="template-card" id="card-call" onclick="loadTemplate('call')">
+                            <div class="card-title">Subroutine</div>
+                            <div class="card-desc">Calls a function at line 3 using PUSH/POP</div>
+                        </div>
+                        <div class="template-card" id="card-stack" onclick="loadTemplate('stack')">
+                            <div class="card-title">Stack PUSH/POP</div>
+                            <div class="card-desc">Pushes and pops values, moving RSP pointer</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <h2>[ INSTRUCTION_MEM_BUFFER ]</h2>
+                    <div class="editor-container">
+                        <textarea id="code" spellcheck="false" placeholder="Enter instructions..."></textarea>
+                    </div>
+                    <div class="controls">
+                        <button id="btn-flash" onclick="loadProgram()">[ FLASH TO RAM ]</button>
+                        <button id="btn-step" onclick="stepProgram()" disabled>[ STEP CLOCK ]</button>
+                        <button id="btn-run" onclick="toggleRun()" disabled>[ AUTO RUN ]</button>
+                        <button id="btn-reset" onclick="resetEmulator()">[ RESET CPU ]</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CENTER: SVG Architecture Map -->
+            <section class="grid-col panel-center">
+                <div class="glass-panel">
+                    <h2>[ SYSTEM_RAM_INSTRUCTIONS ]</h2>
+                    <div class="rom-list" id="rom-list">
+                        <div class="rom-placeholder">No instructions flashed. Write code and click [ FLASH TO RAM ].</div>
+                    </div>
+                </div>
+
+                <div class="glass-panel datapath-panel">
+                    <h2>[ MICROARCHITECTURE_DATAPATH ]</h2>
+                    <div class="svg-container">
+                        <svg viewBox="0 0 500 365" class="svg-element" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Data Buses -->
+                            <path id="bus-ram-decoder" d="M 130,80 L 175,80" class="svg-bus" />
+                            <path id="bus-decoder-regs" d="M 285,80 L 340,80" class="svg-bus" />
+                            <path id="bus-decoder-alu" d="M 230,120 L 230,180" class="svg-bus" />
+                            <path id="bus-regs-alu" d="M 340,140 H 300 V 215 H 285" class="svg-bus" />
+                            <path id="bus-alu-regs" d="M 265,240 L 340,240" class="svg-bus" />
+                            <path id="bus-alu-flags" d="M 230,250 V 315 H 340" class="svg-bus" />
+                            <path id="bus-regs-stack" d="M 340,195 H 150 V 220 H 130" class="svg-bus" />
+
+                            <!-- RAM Block -->
+                            <g id="block-ram" class="svg-block">
+                                <rect x="20" y="40" width="110" height="80" class="svg-block-shape" />
+                                <text x="75" y="70" class="svg-text-bold" text-anchor="middle">INST RAM</text>
+                                <text id="svg-ram-status" x="75" y="92" class="svg-text" text-anchor="middle">OFFLINE</text>
+                            </g>
+
+                            <!-- Instruction Decoder -->
+                            <g id="block-decoder" class="svg-block">
+                                <rect x="175" y="40" width="110" height="80" class="svg-block-shape" />
+                                <text x="230" y="65" class="svg-text-bold" text-anchor="middle">DECODER</text>
+                                <text id="svg-dec-op" x="230" y="85" class="svg-val" text-anchor="middle" fill="var(--neon-green)">-</text>
+                                <text id="svg-dec-args" x="230" y="103" class="svg-text" text-anchor="middle" font-size="9px">-</text>
+                            </g>
+
+                            <!-- General Purpose Registers -->
+                            <g id="block-registers" class="svg-block">
+                                <rect x="340" y="40" width="140" height="210" class="svg-block-shape" />
+                                <text x="410" y="58" class="svg-text-bold" text-anchor="middle">REGISTERS</text>
+                                
+                                <text x="350" y="78" class="svg-label">RAX</text>
+                                <text id="svg-reg-rax" x="470" y="78" class="svg-val" text-anchor="end">0</text>
+                                
+                                <text x="350" y="96" class="svg-label">RBX</text>
+                                <text id="svg-reg-rbx" x="470" y="96" class="svg-val" text-anchor="end">0</text>
+                                
+                                <text x="350" y="114" class="svg-label">RCX</text>
+                                <text id="svg-reg-rcx" x="470" y="114" class="svg-val" text-anchor="end">0</text>
+                                
+                                <text x="350" y="132" class="svg-label">RDX</text>
+                                <text id="svg-reg-rdx" x="470" y="132" class="svg-val" text-anchor="end">0</text>
+                                
+                                <text x="350" y="160" class="svg-label" fill="var(--neon-cyan)">RSP</text>
+                                <text id="svg-reg-rsp" x="470" y="160" class="svg-val" text-anchor="end" fill="var(--neon-cyan)">0x0</text>
+                                
+                                <text x="350" y="185" class="svg-label" fill="var(--neon-cyan)">RBP</text>
+                                <text id="svg-reg-rbp" x="470" y="185" class="svg-val" text-anchor="end" fill="var(--neon-cyan)">0x0</text>
+                                
+                                <text x="350" y="210" class="svg-label" fill="var(--neon-cyan)">RIP</text>
+                                <text id="svg-reg-rip" x="470" y="210" class="svg-val" text-anchor="end" fill="var(--neon-cyan)">0x0</text>
+                            </g>
+
+                            <!-- ALU Block -->
+                            <g id="block-alu" class="svg-block">
+                                <polygon points="175,180 215,180 230,205 245,180 285,180 265,250 195,250" class="svg-alu-shape" />
+                                <text x="230" y="222" class="svg-text-bold" text-anchor="middle">ALU</text>
+                                <text id="svg-alu-op" x="230" y="240" class="svg-val" text-anchor="middle" fill="var(--neon-green)">-</text>
+                            </g>
+
+                            <!-- Flag LEDs -->
+                            <g id="block-flags" class="svg-block">
+                                <rect x="340" y="270" width="140" height="80" class="svg-block-shape" />
+                                <text x="410" y="286" class="svg-text-bold" text-anchor="middle">FLAGS</text>
+                                
+                                <circle id="svg-led-zf" cx="365" cy="312" r="7" class="svg-led-off" />
+                                <text x="365" y="338" class="svg-text" text-anchor="middle" font-size="8.5px">ZF</text>
+                                
+                                <circle id="svg-led-cf" cx="395" cy="312" r="7" class="svg-led-off" />
+                                <text x="395" y="338" class="svg-text" text-anchor="middle" font-size="8.5px">CF</text>
+                                
+                                <circle id="svg-led-sf" cx="425" cy="312" r="7" class="svg-led-off" />
+                                <text x="425" y="338" class="svg-text" text-anchor="middle" font-size="8.5px">SF</text>
+                                
+                                <circle id="svg-led-of" cx="455" cy="312" r="7" class="svg-led-off" />
+                                <text x="455" y="338" class="svg-text" text-anchor="middle" font-size="8.5px">OF</text>
+                            </g>
+
+                            <!-- Stack Interface -->
+                            <g id="block-stack" class="svg-block">
+                                <rect x="20" y="180" width="110" height="80" class="svg-block-shape" />
+                                <text x="75" y="210" class="svg-text-bold" text-anchor="middle">STACK MEM</text>
+                                <text id="svg-stack-val" x="75" y="235" class="svg-text" text-anchor="middle" font-size="9px">0xFFFFF</text>
+                            </g>
+                        </svg>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: Dashboard, Inspector, Console Logs -->
+            <section class="grid-col panel-right">
+                <div class="glass-panel">
+                    <h2>[ HARDWARE_REGISTERS ]</h2>
+                    <div class="registers-grid">
+                        <div class="reg-box" id="reg-box-rax">
+                            <span class="reg-label">RAX <span class="reg-sub">Accumulator</span></span>
+                            <span class="reg-val" id="reg-rax">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-rbx">
+                            <span class="reg-label">RBX <span class="reg-sub">Base register</span></span>
+                            <span class="reg-val" id="reg-rbx">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-rcx">
+                            <span class="reg-label">RCX <span class="reg-sub">Counter register</span></span>
+                            <span class="reg-val" id="reg-rcx">0</span>
+                        </div>
+                        <div class="reg-box" id="reg-box-rdx">
+                            <span class="reg-label">RDX <span class="reg-sub">Data register</span></span>
+                            <span class="reg-val" id="reg-rdx">0</span>
+                        </div>
+                        <div class="reg-box pointer-reg" id="reg-box-rsp">
+                            <span class="reg-label">RSP <span class="reg-sub">Stack Pointer</span></span>
+                            <span class="reg-val" id="reg-rsp">0x000000</span>
+                        </div>
+                        <div class="reg-box pointer-reg" id="reg-box-rbp">
+                            <span class="reg-label">RBP <span class="reg-sub">Base Pointer</span></span>
+                            <span class="reg-val" id="reg-rbp">0x000000</span>
+                        </div>
+                        <div class="reg-box pointer-reg" id="reg-box-rip">
+                            <span class="reg-label">RIP <span class="reg-sub">Instruction Pointer</span></span>
+                            <span class="reg-val" id="reg-rip">0x000000</span>
+                        </div>
+                    </div>
+
+                    <div class="flags-header">ALU STATUS FLAGS</div>
+                    <div class="flags-grid">
+                        <div class="flag-led-container">
+                            <div class="led-indicator" id="flag-zf"></div>
+                            <span class="flag-label">ZF <span class="flag-desc">Zero</span></span>
+                        </div>
+                        <div class="flag-led-container">
+                            <div class="led-indicator" id="flag-cf"></div>
+                            <span class="flag-label">CF <span class="flag-desc">Carry</span></span>
+                        </div>
+                        <div class="flag-led-container">
+                            <div class="led-indicator" id="flag-sf"></div>
+                            <span class="flag-label">SF <span class="flag-desc">Sign</span></span>
+                        </div>
+                        <div class="flag-led-container">
+                            <div class="led-indicator" id="flag-of"></div>
+                            <span class="flag-label">OF <span class="flag-desc">Overflow</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <h2>[ STACK_MEMORY_VIEWER ]</h2>
+                    <div class="stack-meta">
+                        <span>Address</span>
+                        <span>Value (Hex / Dec)</span>
+                    </div>
+                    <div class="stack-list" id="stack-list">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <h2>[ EXECUTION_DECODER_LOG ]</h2>
+                    <div class="log-console" id="log-console">
+                        <div class="log-entry system-msg">&gt;&gt; System loading. Waiting for compile...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- GSAP Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+    <!-- WebAssembly Bridge -->
+    <script src="emulator.js"></script>
+    <script>
+        const statusLed = document.getElementById('status-led');
+        const statusText = document.getElementById('status-text');
+        const logConsole = document.getElementById('log-console');
+        const speedValText = document.getElementById('speed-val');
+        const cycleText = document.getElementById('cycle-count');
+        const canvas = document.getElementById('scroll-canvas');
+        const ctx = canvas.getContext('2d');
+
+        let isRunning = false;
+        let runTimer = null;
+        let cycleCount = 0;
+        let flashedProgram = [];
+
+        const frameCount = 240;
+        const images = [];
+        const frameState = { frame: 0 };
+
+        let loadedCount = 0;
+        let isLoaderFaded = false;
+
+        let wasmReady = false;
+        let imagesReady = false;
+        let initialized = false;
+
+        // Save last state values to check for changes and trigger animations
+        let lastState = {
+            rax: 0, rbx: 0, rcx: 0, rdx: 0, rsp: 0, rbp: 0, rip: 0,
+            zf: 0, cf: 0, sf: 0, of: 0
+        };
+
+        const TEMPLATES = {
+            loop: {
+                cardId: "card-loop",
+                code: `MOV RAX, 0
+MOV RBX, 5
+ADD RAX, 1
+CMP RAX, RBX
+JNE 2
+HLT`
+            },
+            fib: {
+                cardId: "card-fib",
+                code: `MOV RAX, 0
+MOV RBX, 1
+MOV RCX, 0
+MOV RDX, RAX
+ADD RDX, RBX
+MOV RAX, RBX
+MOV RBX, RDX
+ADD RCX, 1
+CMP RCX, 10
+JNE 3
+HLT`
+            },
+            call: {
+                cardId: "card-call",
+                code: `MOV RAX, 10
 CALL 3
 HLT
 ADD RAX, 5
-RET</textarea>
-        <div class="controls">
-            <button onclick="loadProgram()">[ FLASH TO RAM ]</button>
-            <button onclick="stepProgram()">[ STEP CLOCK ]</button>
-        </div>
-    </div>
+RET`
+            },
+            stack: {
+                cardId: "card-stack",
+                code: `MOV RAX, 42
+MOV RBX, 99
+PUSH RAX
+PUSH RBX
+POP RAX
+POP RBX
+HLT`
+            }
+        };
 
-    <!-- RIGHT: CPU Die Dashboard -->
-    <div class="glass-panel dashboard">
-        <h3>[ HARDWARE_REGISTERS ]</h3>
+        // Initialize editor with loop template
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('code').value = TEMPLATES.loop.code;
+        });
 
-        <div class="cpu-die">
-            <div class="reg-box"><span class="reg-name">RAX</span> <span class="reg-val" id="reg-rax">0</span></div>
-            <div class="reg-box"><span class="reg-name">RBX</span> <span class="reg-val" id="reg-rbx">0</span></div>
-            <div class="reg-box"><span class="reg-name">RCX</span> <span class="reg-val" id="reg-rcx">0</span></div>
-            <div class="reg-box"><span class="reg-name">RDX</span> <span class="reg-val" id="reg-rdx">0</span></div>
-            <div class="reg-box"><span class="reg-name">RSP</span> <span class="reg-val" id="reg-rsp">0</span></div>
-            <div class="reg-box"><span class="reg-name">RIP</span> <span class="reg-val" id="reg-rip">0</span></div>
+        // Wasm Initialized Callback
+        Module.onRuntimeInitialized = () => {
+            wasmReady = true;
+            Module._init_emulator();
+            updateUI(false);
+            logEntry("Virtual x86-64 execution core booted successfully.", "success-msg");
+            checkInitialization();
+        };
 
-            <!-- Zero Flag gets a full row spanning 2 columns -->
-            <div class="reg-box" style="grid-column: span 2; border-color: #555;">
-                <span class="reg-name">FLAGS (ZF)</span> <span class="reg-val" id="reg-zf">0</span>
-            </div>
-        </div>
+        // Path generator for JPEG frames
+        const getFramePath = idx => `./frames/ezgif-frame-${String(idx + 1).padStart(3, '0')}.jpg`;
 
-        <div class="status-container">
-            <div class="led" id="status-led"></div>
-            <div id="status-text">Booting Wasm Subsystem...</div>
-        </div>
-    </div>
-</div>
+        // Progress ring config
+        const circle = document.querySelector('.progress-ring__circle');
+        const radius = circle.r.baseVal.value;
+        const circumference = radius * 2 * Math.PI;
+        circle.style.strokeDasharray = `${circumference} ${circumference}`;
+        circle.style.strokeDashoffset = circumference;
 
-<!-- WebAssembly Bridge -->
-<script src="emulator.js"></script>
-<script>
-    const statusLed = document.getElementById('status-led');
-    const statusText = document.getElementById('status-text');
+        function setLoaderProgress(percent) {
+            const offset = circumference - (percent / 100) * circumference;
+            circle.style.strokeDashoffset = offset;
+            document.getElementById('loader-percent').textContent = Math.round(percent) + '%';
+        }
 
-    // Wasm Initialization
-    Module.onRuntimeInitialized = () => {
-        statusLed.style.background = "#00ff41";
-        statusLed.style.boxShadow = "0 0 10px #00ff41";
-        statusText.innerText = "SYS.ONLINE - Waiting for instructions.";
-        Module._init_emulator();
-        updateUI();
-    };
+        // Show Skip button if loading is delayed (e.g. slow system)
+        setTimeout(() => {
+            const skipBtn = document.getElementById('skip-btn');
+            if (skipBtn && loadedCount < frameCount) {
+                skipBtn.classList.add('visible');
+            }
+        }, 4000);
 
-    function loadProgram() {
-        Module._init_emulator();
-        const code = document.getElementById('code').value;
-        const lines = code.split('\n');
+        function checkInitialization() {
+            if (wasmReady && imagesReady && !initialized) {
+                initialized = true;
 
-        for (let i = 0; i < lines.length && i < 100; i++) {
-            const line = lines[i].trim();
-            if (line.length > 0) {
-                Module.ccall('load_instruction', null, ['number', 'string'], [i, line]);
+                // Draw initial frame
+                if (images[0]) renderCanvasFrame(images[0]);
+
+                // Unlock scrolling
+                document.body.classList.remove('loading');
+
+                // Hide loader screen gracefully
+                gsap.to("#loader", {
+                    opacity: 0,
+                    pointerEvents: "none",
+                    duration: 0.8,
+                    ease: "power2.out",
+                    onComplete: () => {
+                        document.getElementById('loader').style.display = 'none';
+                        buildGSAPTimeline();
+                    }
+                });
+
+                statusLed.style.background = "#00ff41";
+                statusLed.style.boxShadow = "0 0 10px #00ff41";
+                statusText.innerText = "SYS.ONLINE - Waiting for instructions.";
             }
         }
 
-        statusLed.style.background = "#00ff41";
-        statusLed.style.boxShadow = "0 0 10px #00ff41";
-        statusText.innerText = `RAM.FLASHED - ${lines.length} instructions loaded.`;
-        updateUI();
-    }
+        function onImageLoad() {
+            loadedCount++;
+            const percent = (loadedCount / frameCount) * 100;
+            setLoaderProgress(percent);
 
-    function stepProgram() {
-        const status = Module._step_emulator();
-
-        if (status === 0) {
-            // Halted State (Red)
-            statusLed.style.background = "#ff003c";
-            statusLed.style.boxShadow = "0 0 15px #ff003c";
-            statusText.innerText = "SYS.HALTED - Execution complete.";
-        } else {
-            // Active Step (Pulse animation simulation)
-            statusLed.style.background = "#00b8ff";
-            statusLed.style.boxShadow = "0 0 15px #00b8ff";
-            statusText.innerText = "SYS.ACTIVE - Clock cycle advanced.";
+            if (loadedCount === frameCount) {
+                imagesReady = true;
+                checkInitialization();
+            }
         }
-        updateUI();
-    }
 
-    function updateUI() {
-        document.getElementById('reg-rax').innerText = Module._get_rax();
-        document.getElementById('reg-rbx').innerText = Module._get_rbx();
-        document.getElementById('reg-rcx').innerText = Module._get_rcx();
-        document.getElementById('reg-rdx').innerText = Module._get_rdx();
+        function skipLoading() {
+            imagesReady = true;
+            checkInitialization();
+        }
 
-        // Format pointers in Hex so they look like actual memory addresses!
-        document.getElementById('reg-rsp').innerText = "0x" + Module._get_rsp().toString(16).toUpperCase();
-        document.getElementById('reg-rip').innerText = "0x" + Module._get_rip().toString(16).toUpperCase();
+        // Load frames in background
+        for (let i = 0; i < frameCount; i++) {
+            const img = new Image();
+            img.src = getFramePath(i);
+            img.onload = onImageLoad;
+            img.onerror = () => {
+                console.warn(`Failed to preload frame: ${img.src}`);
+                onImageLoad();
+            };
+            images.push(img);
+        }
 
-        document.getElementById('reg-zf').innerText = Module._get_zf();
-    }
-</script>
+        function logEntry(msg, className = "system-msg") {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${className}`;
+            entry.innerHTML = `&gt;&gt; ${msg}`;
+            logConsole.appendChild(entry);
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+
+        function loadTemplate(name) {
+            if (isRunning) toggleRun(); // Pause execution
+            
+            document.querySelectorAll('.template-card').forEach(c => c.classList.remove('active'));
+            document.getElementById(TEMPLATES[name].cardId).classList.add('active');
+            
+            document.getElementById('code').value = TEMPLATES[name].code;
+            logEntry(`Template loaded: '${name.toUpperCase()}' - compile required.`, "info-msg");
+            
+            // Lock running buttons till flashed
+            document.getElementById('btn-step').disabled = true;
+            document.getElementById('btn-run').disabled = true;
+            
+            resetEmulator(true);
+        }
+
+        function updateSpeedVal(val) {
+            speedValText.innerText = val;
+            if (isRunning) {
+                clearInterval(runTimer);
+                const delay = parseInt(val);
+                runTimer = setInterval(executeClockCycle, delay);
+            }
+        }
+
+        function loadProgram() {
+            if (isRunning) toggleRun();
+
+            Module._init_emulator();
+            cycleCount = 0;
+            cycleText.innerText = cycleCount;
+
+            const codeText = document.getElementById('code').value;
+            const lines = codeText.split('\n');
+            flashedProgram = [];
+
+            let loadedLinesCount = 0;
+            for (let i = 0; i < lines.length && i < 100; i++) {
+                const line = lines[i];
+                const commentIdx = line.indexOf(';');
+                const cleanLine = commentIdx !== -1 ? line.substring(0, commentIdx).trim() : line.trim();
+                
+                flashedProgram.push(cleanLine);
+                Module.ccall('load_instruction', null, ['number', 'string'], [i, cleanLine]);
+                
+                if (cleanLine.length > 0) loadedLinesCount++;
+            }
+
+            statusLed.style.background = "#00ff41";
+            statusLed.style.boxShadow = "0 0 10px #00ff41";
+            statusText.innerText = `RAM.FLASHED - ${loadedLinesCount} instructions loaded.`;
+            logEntry(`Flashed ${loadedLinesCount} executable lines into instruction RAM cache.`, "success-msg");
+
+            document.getElementById('btn-step').disabled = false;
+            document.getElementById('btn-run').disabled = false;
+
+            // Redraw instruction view
+            const romList = document.getElementById('rom-list');
+            romList.innerHTML = '';
+            for (let i = 0; i < flashedProgram.length; i++) {
+                const text = flashedProgram[i];
+                const clean = text.trim();
+                if (clean.length === 0) continue;
+
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'rom-line';
+                lineDiv.id = `rom-line-${i}`;
+                lineDiv.innerHTML = `<span class="rom-idx">${i}</span><span class="rom-inst">${clean}</span>`;
+                romList.appendChild(lineDiv);
+            }
+
+            const svgRamStatus = document.getElementById('svg-ram-status');
+            if (svgRamStatus) {
+                svgRamStatus.textContent = `${loadedLinesCount} INST`;
+                svgRamStatus.setAttribute('fill', 'var(--neon-green)');
+            }
+
+            updateUI(false);
+        }
+
+        function parseInstructionText(line) {
+            if (!line) return { op: 'NOP', dest: '', src: '' };
+            const tokens = line.trim().toUpperCase().split(/[\s,]+/);
+            const op = tokens[0] || 'NOP';
+            const dest = tokens[1] || '';
+            const src = tokens[2] || '';
+            return { op, dest, src };
+        }
+
+        function executeClockCycle() {
+            const rip = Module._get_rip();
+            if (rip >= flashedProgram.length || rip < 0) {
+                logEntry("Clock termination: instruction pointer went out of bounds.", "error-msg");
+                if (isRunning) toggleRun();
+                return;
+            }
+
+            const rawInstText = flashedProgram[rip];
+            const parsed = parseInstructionText(rawInstText);
+
+            // Reset all paths
+            const buses = ['bus-ram-decoder', 'bus-decoder-regs', 'bus-decoder-alu', 'bus-regs-alu', 'bus-alu-regs', 'bus-alu-flags', 'bus-regs-stack'];
+            buses.forEach(b => {
+                const el = document.getElementById(b);
+                if (el) el.setAttribute('class', 'svg-bus');
+            });
+            const blocks = ['block-ram', 'block-decoder', 'block-registers', 'block-alu', 'block-flags', 'block-stack'];
+            blocks.forEach(bl => {
+                const el = document.getElementById(bl);
+                if (el) el.setAttribute('class', 'svg-block');
+            });
+
+            // If instruction is empty/NOP, jump past it
+            if (!rawInstText || rawInstText.trim().length === 0) {
+                const status = Module._step_emulator();
+                updateUI(false);
+                if (status === 0) {
+                    haltCPU();
+                }
+                return;
+            }
+
+            // Get slide speed
+            const speed = parseInt(document.getElementById('speed-slider').value);
+            const isFast = speed <= 350;
+
+            const delay1 = isFast ? 0 : 150;
+            const delay2 = isFast ? 0 : 300;
+
+            // Set Decoder values
+            document.getElementById('svg-dec-op').textContent = parsed.op;
+            document.getElementById('svg-dec-args').textContent = (parsed.dest + (parsed.src ? ', ' + parsed.src : ''));
+
+            // Fetch phase: RAM -> Decoder
+            const ram = document.getElementById('block-ram');
+            const busRamDec = document.getElementById('bus-ram-decoder');
+            const dec = document.getElementById('block-decoder');
+
+            if (ram) ram.setAttribute('class', 'svg-block block-active-cyan');
+            if (busRamDec) busRamDec.setAttribute('class', 'svg-bus bus-active-cyan');
+
+            setTimeout(() => {
+                if (dec) dec.setAttribute('class', 'svg-block block-active-cyan');
+
+                // Execute phase
+                setTimeout(() => {
+                    const regFile = document.getElementById('block-registers');
+                    const alu = document.getElementById('block-alu');
+                    const flags = document.getElementById('block-flags');
+                    const stack = document.getElementById('block-stack');
+
+                    if (['MOV'].includes(parsed.op)) {
+                        const busDecReg = document.getElementById('bus-decoder-regs');
+                        if (busDecReg) busDecReg.setAttribute('class', 'svg-bus bus-active-cyan');
+                        if (regFile) regFile.setAttribute('class', 'svg-block block-active-cyan');
+                    } 
+                    else if (['ADD', 'SUB', 'CMP'].includes(parsed.op)) {
+                        const busDecAlu = document.getElementById('bus-decoder-alu');
+                        const busRegAlu = document.getElementById('bus-regs-alu');
+                        const busAluFlags = document.getElementById('bus-alu-flags');
+                        
+                        if (busDecAlu) busDecAlu.setAttribute('class', 'svg-bus bus-active-green');
+                        if (busRegAlu) busRegAlu.setAttribute('class', 'svg-bus bus-active-green');
+                        if (alu) alu.setAttribute('class', 'svg-block block-active-green');
+                        
+                        const aluOp = document.getElementById('svg-alu-op');
+                        if (aluOp) aluOp.textContent = parsed.op === 'ADD' ? '+' : (parsed.op === 'SUB' ? '-' : '?');
+
+                        setTimeout(() => {
+                            if (busAluFlags) busAluFlags.setAttribute('class', 'svg-bus bus-active-yellow');
+                            if (flags) flags.setAttribute('class', 'svg-block block-active-yellow');
+                            
+                            if (parsed.op !== 'CMP') {
+                                const busAluReg = document.getElementById('bus-alu-regs');
+                                if (busAluReg) busAluReg.setAttribute('class', 'svg-bus bus-active-green');
+                                if (regFile) regFile.setAttribute('class', 'svg-block block-active-green');
+                            }
+                        }, isFast ? 0 : 150);
+                    } 
+                    else if (['JMP', 'JE', 'JNE'].includes(parsed.op)) {
+                        const busDecReg = document.getElementById('bus-decoder-regs');
+                        if (busDecReg) busDecReg.setAttribute('class', 'svg-bus bus-active-yellow');
+                        if (regFile) regFile.setAttribute('class', 'svg-block block-active-yellow');
+                    }
+                    else if (['PUSH', 'CALL'].includes(parsed.op)) {
+                        const busDecReg = document.getElementById('bus-decoder-regs');
+                        const busRegStack = document.getElementById('bus-regs-stack');
+                        
+                        if (busDecReg) busDecReg.setAttribute('class', 'svg-bus bus-active-pink');
+                        if (busRegStack) busRegStack.setAttribute('class', 'svg-bus bus-active-pink');
+                        if (stack) stack.setAttribute('class', 'svg-block block-active-pink');
+                        if (regFile) regFile.setAttribute('class', 'svg-block block-active-pink');
+                    }
+                    else if (['POP', 'RET'].includes(parsed.op)) {
+                        const busRegStack = document.getElementById('bus-regs-stack');
+                        const busDecReg = document.getElementById('bus-decoder-regs');
+                        
+                        if (busRegStack) busRegStack.setAttribute('class', 'svg-bus bus-active-pink');
+                        if (busDecReg) busDecReg.setAttribute('class', 'svg-bus bus-active-pink');
+                        if (stack) stack.setAttribute('class', 'svg-block block-active-pink');
+                        if (regFile) regFile.setAttribute('class', 'svg-block block-active-pink');
+                    }
+
+                    // Perform emulated step
+                    const status = Module._step_emulator();
+                    cycleCount++;
+                    cycleText.innerText = cycleCount;
+
+                    logEntry(`CLOCK TICK: Executed [ ${rawInstText.trim()} ]`, "info-msg");
+                    updateUI(true);
+
+                    if (status === 0) {
+                        haltCPU();
+                    }
+
+                }, delay2);
+            }, delay1);
+        }
+
+        function stepProgram() {
+            if (isRunning) return;
+            executeClockCycle();
+        }
+
+        function toggleRun() {
+            const btn = document.getElementById('btn-run');
+            const stepBtn = document.getElementById('btn-step');
+            const flashBtn = document.getElementById('btn-flash');
+            
+            if (isRunning) {
+                clearInterval(runTimer);
+                isRunning = false;
+                btn.innerText = "[ AUTO RUN ]";
+                btn.classList.remove('running');
+                stepBtn.disabled = false;
+                flashBtn.disabled = false;
+                
+                statusLed.style.background = "var(--neon-green)";
+                statusLed.style.boxShadow = "0 0 10px var(--neon-green)";
+                statusText.innerText = "SYS.ONLINE - Execution paused.";
+                logEntry("Clock pulse stopped manually.", "warn-msg");
+            } else {
+                isRunning = true;
+                btn.innerText = "[ PAUSE CLOCK ]";
+                btn.classList.add('running');
+                stepBtn.disabled = true;
+                flashBtn.disabled = true;
+
+                statusLed.style.background = "#00b8ff";
+                statusLed.style.boxShadow = "0 0 15px #00b8ff";
+                statusText.innerText = "SYS.ACTIVE - Clock cycle advanced.";
+                logEntry("Automatic clock pulses enabled.", "success-msg");
+
+                const delay = parseInt(document.getElementById('speed-slider').value);
+                executeClockCycle();
+                runTimer = setInterval(executeClockCycle, delay);
+            }
+        }
+
+        function haltCPU() {
+            if (isRunning) {
+                clearInterval(runTimer);
+                isRunning = false;
+                const btn = document.getElementById('btn-run');
+                btn.innerText = "[ AUTO RUN ]";
+                btn.classList.remove('running');
+            }
+
+            document.getElementById('btn-step').disabled = true;
+            document.getElementById('btn-run').disabled = true;
+            document.getElementById('btn-flash').disabled = false;
+
+            statusLed.style.background = "var(--neon-pink)";
+            statusLed.style.boxShadow = "0 0 15px var(--neon-pink)";
+            statusText.innerText = "SYS.HALTED - Execution complete.";
+            logEntry("Execution halted by HLT instruction.", "error-msg");
+
+            document.querySelectorAll('.rom-line').forEach(l => l.classList.remove('active-rip'));
+            const rip = Module._get_rip();
+            const romLine = document.getElementById(`rom-line-${rip - 1}`);
+            if (romLine) {
+                romLine.classList.add('halted');
+            }
+        }
+
+        function resetEmulator(quiet = false) {
+            if (isRunning) toggleRun();
+
+            Module._init_emulator();
+            cycleCount = 0;
+            cycleText.innerText = cycleCount;
+
+            document.getElementById('btn-step').disabled = true;
+            document.getElementById('btn-run').disabled = true;
+
+            const romList = document.getElementById('rom-list');
+            romList.innerHTML = '<div class="rom-placeholder">No instructions flashed. Write code and click [ FLASH TO RAM ].</div>';
+
+            const svgRamStatus = document.getElementById('svg-ram-status');
+            if (svgRamStatus) {
+                svgRamStatus.textContent = `OFFLINE`;
+                svgRamStatus.setAttribute('fill', 'var(--text-secondary)');
+            }
+
+            const buses = ['bus-ram-decoder', 'bus-decoder-regs', 'bus-decoder-alu', 'bus-regs-alu', 'bus-alu-regs', 'bus-alu-flags', 'bus-regs-stack'];
+            buses.forEach(b => {
+                const el = document.getElementById(b);
+                if (el) el.setAttribute('class', 'svg-bus');
+            });
+            const blocks = ['block-ram', 'block-decoder', 'block-registers', 'block-alu', 'block-flags', 'block-stack'];
+            blocks.forEach(bl => {
+                const el = document.getElementById(bl);
+                if (el) el.setAttribute('class', 'svg-block');
+            });
+
+            document.getElementById('svg-dec-op').textContent = '-';
+            document.getElementById('svg-dec-args').textContent = '-';
+            document.getElementById('svg-alu-op').textContent = '-';
+
+            statusLed.style.background = "#ffcc00";
+            statusLed.style.boxShadow = "0 0 10px #ffcc00";
+            statusText.innerText = "Booting Wasm Subsystem...";
+            if (!quiet) logEntry("CPU core reset. CPU cache cleared, stack pointer reset.", "warn-msg");
+
+            updateUI(false);
+        }
+
+        function updateUI(animateChanges = true) {
+            if (!Module._get_rax) return;
+
+            const rax = Module._get_rax();
+            const rbx = Module._get_rbx();
+            const rcx = Module._get_rcx();
+            const rdx = Module._get_rdx();
+            const rsp = Module._get_rsp();
+            const rbp = Module._get_rbp();
+            const rip = Module._get_rip();
+
+            const zf = Module._get_zf();
+            const cf = Module._get_cf();
+            const sf = Module._get_sf();
+            const of = Module._get_of();
+
+            // Set text values
+            updateRegDisplay('rax', rax, animateChanges);
+            updateRegDisplay('rbx', rbx, animateChanges);
+            updateRegDisplay('rcx', rcx, animateChanges);
+            updateRegDisplay('rdx', rdx, animateChanges);
+            
+            updateRegDisplay('rsp', "0x" + rsp.toString(16).toUpperCase(), animateChanges, rsp);
+            updateRegDisplay('rbp', "0x" + rbp.toString(16).toUpperCase(), animateChanges, rbp);
+            updateRegDisplay('rip', "0x" + rip.toString(16).toUpperCase(), animateChanges, rip);
+
+            // Reflect in SVG
+            document.getElementById('svg-reg-rax').textContent = rax;
+            document.getElementById('svg-reg-rbx').textContent = rbx;
+            document.getElementById('svg-reg-rcx').textContent = rcx;
+            document.getElementById('svg-reg-rdx').textContent = rdx;
+            document.getElementById('svg-reg-rsp').textContent = "0x" + rsp.toString(16).toUpperCase();
+            document.getElementById('svg-reg-rbp').textContent = "0x" + rbp.toString(16).toUpperCase();
+            document.getElementById('svg-reg-rip').textContent = "0x" + rip.toString(16).toUpperCase();
+
+            // Set Stack value in stack box
+            const stackValText = document.getElementById('svg-stack-val');
+            if (stackValText && Module._get_memory_ptr) {
+                const memPtr = Module._get_memory_ptr();
+                let topVal = 0n;
+                for (let i = 0; i < 8; i++) {
+                    topVal |= BigInt(Module.HEAPU8[memPtr + rsp + i]) << BigInt(i * 8);
+                }
+                stackValText.textContent = "Top: " + topVal.toString();
+            }
+
+            // Set flags
+            updateFlagDisplay('zf', zf);
+            updateFlagDisplay('cf', cf);
+            updateFlagDisplay('sf', sf);
+            updateFlagDisplay('of', of);
+
+            // Highlight instruction line
+            document.querySelectorAll('.rom-line').forEach(l => l.classList.remove('active-rip'));
+            const activeLine = document.getElementById(`rom-line-${rip}`);
+            if (activeLine) {
+                activeLine.classList.add('active-rip');
+                activeLine.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+
+            // Redraw Stack visualizer
+            updateStackUI(rsp, rbp);
+
+            // Save last state
+            lastState = { rax, rbx, rcx, rdx, rsp, rbp, rip, zf, cf, sf, of };
+        }
+
+        function updateRegDisplay(id, val, animate, numericVal = null) {
+            const el = document.getElementById(`reg-${id}`);
+            const box = document.getElementById(`reg-box-${id}`);
+            if (!el) return;
+
+            const checkVal = numericVal !== null ? numericVal : val;
+            const changed = lastState[id] !== checkVal;
+
+            el.innerText = val;
+
+            if (animate && changed) {
+                box.classList.remove('active-pulse');
+                void box.offsetWidth; // Trigger reflow
+                box.classList.add('active-pulse');
+                
+                const svgText = document.getElementById(`svg-reg-${id}`);
+                if (svgText) {
+                    svgText.setAttribute('fill', '#ffffff');
+                    setTimeout(() => {
+                        svgText.setAttribute('fill', id === 'rip' || id === 'rsp' || id === 'rbp' ? 'var(--neon-cyan)' : 'var(--neon-green)');
+                    }, 500);
+                }
+            }
+        }
+
+        function updateFlagDisplay(id, active) {
+            const el = document.getElementById(`flag-${id}`);
+            const svgLed = document.getElementById(`svg-led-${id}`);
+            if (!el) return;
+
+            if (active === 1) {
+                el.classList.add('active');
+                if (svgLed) {
+                    if (id === 'zf') svgLed.setAttribute('class', 'svg-led-active-green');
+                    if (id === 'cf') svgLed.setAttribute('class', 'svg-led-active-cyan');
+                    if (id === 'sf') svgLed.setAttribute('class', 'svg-led-active-yellow');
+                    if (id === 'of') svgLed.setAttribute('class', 'svg-led-active-red');
+                }
+            } else {
+                el.classList.remove('active');
+                if (svgLed) svgLed.setAttribute('class', 'svg-led-off');
+            }
+        }
+
+        function updateStackUI(rsp, rbp) {
+            const stackContainer = document.getElementById('stack-list');
+            if (!stackContainer) return;
+            
+            stackContainer.innerHTML = '';
+
+            if (!Module._get_memory_ptr) return;
+            const memoryPtr = Module._get_memory_ptr();
+
+            const maxStack = 1024 * 1024 - 8;
+            const startAddr = maxStack;
+            const endAddr = Math.min(rsp - 32, maxStack - 8 * 7);
+
+            for (let addr = startAddr; addr >= endAddr && addr >= 0; addr -= 8) {
+                let val = 0n;
+                const offset = memoryPtr + addr;
+                for (let i = 0; i < 8; i++) {
+                    val |= BigInt(Module.HEAPU8[offset + i]) << BigInt(i * 8);
+                }
+
+                const isRSP = (addr === rsp);
+                const isRBP = (addr === rbp);
+
+                const slot = document.createElement('div');
+                slot.className = `stack-slot ${isRSP ? 'active-rsp' : ''} ${isRBP ? 'active-rbp' : ''}`;
+                
+                let label = '';
+                if (isRSP && isRBP) label = ' <span class="badge badge-both">RSP & RBP</span>';
+                else if (isRSP) label = ' <span class="badge badge-rsp">RSP</span>';
+                else if (isRBP) label = ' <span class="badge badge-rbp">RBP</span>';
+
+                const addrHex = "0x" + addr.toString(16).toUpperCase();
+                const valHex = "0x" + val.toString(16).toUpperCase().padStart(16, '0');
+                const valDec = val.toString();
+
+                slot.innerHTML = `
+                    <div class="stack-addr">${addrHex}${label}</div>
+                    <div class="stack-val-hex">${valHex}</div>
+                    <div class="stack-val-dec">(${valDec})</div>
+                `;
+                stackContainer.appendChild(slot);
+            }
+        }
+
+        // Draw centered covered image inside canvas
+        function renderCanvasFrame(img) {
+            ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+            const imgW = img.naturalWidth;
+            const imgH = img.naturalHeight;
+            const viewW = window.innerWidth;
+            const viewH = window.innerHeight;
+
+            const imgRatio = imgW / imgH;
+            const viewRatio = viewW / viewH;
+
+            let w, h, x, y;
+
+            if (viewRatio > imgRatio) {
+                w = viewW;
+                h = viewW / imgRatio;
+                x = 0;
+                y = (viewH - h) / 2;
+            } else {
+                w = viewH * imgRatio;
+                h = viewH;
+                x = (viewW - w) / 2;
+                y = 0;
+            }
+
+            ctx.drawImage(img, x, y, w, h);
+        }
+
+        function resizeCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+
+            const currentImg = images[frameState.frame];
+            if (currentImg && currentImg.complete) {
+                renderCanvasFrame(currentImg);
+            }
+        }
+
+        function buildGSAPTimeline() {
+            resizeCanvas();
+            gsap.registerPlugin(ScrollTrigger);
+
+            const timeline = gsap.timeline({
+                scrollTrigger: {
+                    trigger: ".scroll-wrapper",
+                    start: "top top",
+                    end: "bottom bottom",
+                    scrub: 0.5,
+                    pin: ".canvas-container",
+                    invalidateOnRefresh: true
+                }
+            });
+
+            // Scrub frames
+            timeline.to(frameState, {
+                frame: frameCount - 1,
+                snap: "frame",
+                ease: "none",
+                duration: 100,
+                onUpdate: () => {
+                    const img = images[frameState.frame];
+                    if (img && img.complete) {
+                        renderCanvasFrame(img);
+                    }
+                }
+            }, 0);
+
+            // Intro text fades out
+            timeline.to(".intro-text", {
+                opacity: 0,
+                y: -50,
+                duration: 12,
+                ease: "power2.in"
+            }, 8);
+
+            // Text overlays slide in/out
+            timeline.fromTo(".text-1", 
+                { opacity: 0, y: 50 },
+                { opacity: 1, y: 0, duration: 10, ease: "power2.out" },
+                22
+            ).to(".text-1", 
+                { opacity: 0, y: -50, duration: 8, ease: "power2.in" },
+                38
+            );
+
+            timeline.fromTo(".text-2", 
+                { opacity: 0, y: 50 },
+                { opacity: 1, y: 0, duration: 10, ease: "power2.out" },
+                50
+            ).to(".text-2", 
+                { opacity: 0, y: -50, duration: 8, ease: "power2.in" },
+                66
+            );
+
+            timeline.fromTo(".text-3", 
+                { opacity: 0, y: 50 },
+                { opacity: 1, y: 0, duration: 10, ease: "power2.out" },
+                78
+            ).to(".text-3", 
+                { opacity: 0, y: -50, duration: 8, ease: "power2.in" },
+                92
+            );
+        }
+    </script>
 </body>
 </html>
